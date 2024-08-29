@@ -1,0 +1,82 @@
+# use glob syntax
+syntax: glob
+
+# User-specific files
+*.suo
+*.user
+*.sln.docstates
+.vs/
+
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Bb]in/
+[Oo]bj/
+[Dd]ist/
+[Ss]erverFiles*/
+
+# MSTest test Results
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+
+*_i.c
+*_p.c
+*_i.h
+*.ilk
+*.meta
+*.obj
+*.pch
+*.pdb
+*.pgc
+*.pgd
+*.rsp
+*.sbr
+*.tlb
+*.tli
+*.tlh
+*.tmp
+*.tmp_proj
+*.log
+*.vspscc
+*.vssscc
+*.pidb
+*.svclog
+*.scc
+
+# Visual Studio profiler
+*.psess
+*.vsp
+*.vspx
+
+# ReSharper is a .NET coding add-in
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+
+
+~$*
+*~
+
+# Microsoft Fakes
+FakesAssemblies/
+*.suo
+*.testsettings
+*.suo
+*.user
+*.vsmdi
+
+#packages (restored automatically by NuGet)
+packages/
+
+# switch to regexp syntax to allow ignoring node_modules only at root level
+*/node_modules
+web/Fca.Tools.Client/ims/*
+web/Fca.Tools.Server/buildConfig.json
+web/Fca.Tools.Server/appSettings/*
+web/Fca.Tools.Server/Home/_dashboard_sources.cshtml
+web/Fca.Tools.Server/Home/_tools_sources.cshtml
+node_modules/*
+syntax: regexp
+^node_modules/
