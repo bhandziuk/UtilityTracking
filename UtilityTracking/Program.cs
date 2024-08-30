@@ -34,57 +34,61 @@ services.AddTransient<Requests>();
 var provider = services.BuildServiceProvider();
 
 
-var requests = provider.GetRequiredService<Requests>();
+var gaPower = provider.GetRequiredService<Requests>();
 var credentials = provider.GetService<GeorgiaPowerCredentials>();
 
-await requests.Authenticate(credentials);
+await gaPower.Authenticate(credentials);
 
 var startDate = DateTime.Parse("08/26/2023");
 var endDate = DateTime.Parse("08/27/2024");
 
-var hourlyData = await requests.Hourly(startDate, endDate);
+var hourlyData = await gaPower.Hourly(startDate, endDate);
 
 var rootDir = Directory.GetParent(AppDomain.CurrentDomain.BaseDirectory).Parent.Parent.Parent.Parent.FullName;
 
-var hourlyText = File.OpenText(Path.Combine(rootDir, "Hourly GA Power Data.json")).ReadToEnd();
+var appData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), AppDomain.CurrentDomain.FriendlyName);
 
-var serializer = new JsonSerializerSettings
-{
-    ContractResolver = new CamelCasePropertyNamesContractResolver(),
-    Converters = { new IsoDateTimeConverter() }
-};
+//var hourlyText = File.OpenText(Path.Combine(rootDir, "Hourly GA Power Data.json")).ReadToEnd();
+
+//var serializer = new JsonSerializerSettings
+//{
+//    ContractResolver = new CamelCasePropertyNamesContractResolver(),
+//    Converters = { new IsoDateTimeConverter() }
+//};
 
 //var data = JsonConvert.DeserializeObject<PowerUsageResult>(hourlyText, serializer);
 
 //var total = data.Series.Cost.Data.Count();
 
-//var sqliteFile = Path.Combine(rootDir, "UtilityData.db");
+Directory.CreateDirectory(appData);
 
-//using var connection = new SqliteConnection($"Data Source={sqliteFile};");
+var sqliteFile = Path.Combine(appData, gaPower.Account.AccountNumber + ".db");
 
-//connection.Open();
+using var connection = new SqliteConnection($"Data Source={sqliteFile};");
 
-//using var createGaPowerHourly = connection.CreateCommand();
-//createGaPowerHourly.CommandText = "CREATE TABLE if not exists GeorgiaPowerHourly (Date DATETIME PRIMARY KEY, Cost DOUBLE,Usage DOUBLE,[Temp] DOUBLE);";
-//createGaPowerHourly.ExecuteNonQuery();
+connection.Open();
 
-//var costs = data.Series.Cost.Data.ToDictionary(o => o.Name, o => o.Y);
-//var usages = data.Series.Usage.Data.ToDictionary(o => o.Name, o => o.Y);
-//var temps = data.Series.Temp.Data.ToDictionary(o => o.Name, o => o.Y);
+using var createGaPowerHourly = connection.CreateCommand();
+createGaPowerHourly.CommandText = "CREATE TABLE if not exists GeorgiaPowerHourly (Date DATETIME PRIMARY KEY, Cost DOUBLE,Usage DOUBLE,[Temp] DOUBLE);";
+createGaPowerHourly.ExecuteNonQuery();
 
-//var allData = costs.Select(o => new GeorgiaPowerHourly(o.Key, o.Value, temps[o.Key], usages[o.Key]));
+var costs = hourlyData.Series.Cost.Data.ToDictionary(o => o.Name, o => o.Y);
+var usages = hourlyData.Series.Usage.Data.ToDictionary(o => o.Name, o => o.Y);
+var temps = hourlyData.Series.Temp.Data.ToDictionary(o => o.Name, o => o.Y);
 
-//var transaction = connection.BeginTransaction();
+var allData = costs.Select(o => new GeorgiaPowerHourly(o.Key, o.Value, temps[o.Key], usages[o.Key]));
 
-//foreach (var point in allData)
-//{
-//    using var cmd = connection.CreateCommand();
-//    cmd.CommandText = "Insert into GeorgiaPowerHourly(Date, Cost, Usage, [Temp]) values(@Date, @Cost, @Usage, @Temp)";
-//    cmd.Parameters.Add(new SqliteParameter("@Date", point.Date));
-//    cmd.Parameters.Add(new SqliteParameter("@Cost", point.Cost));
-//    cmd.Parameters.Add(new SqliteParameter("@Usage", point.Usage));
-//    cmd.Parameters.Add(new SqliteParameter("@Temp", point.Temp));
-//    cmd.ExecuteNonQuery();
-//}
+var transaction = connection.BeginTransaction();
 
-//transaction.Commit();
+foreach (var point in allData)
+{
+    using var cmd = connection.CreateCommand();
+    cmd.CommandText = "Insert into GeorgiaPowerHourly(Date, Cost, Usage, [Temp]) values(@Date, @Cost, @Usage, @Temp)";
+    cmd.Parameters.Add(new SqliteParameter("@Date", point.Date));
+    cmd.Parameters.Add(new SqliteParameter("@Cost", point.Cost));
+    cmd.Parameters.Add(new SqliteParameter("@Usage", point.Usage));
+    cmd.Parameters.Add(new SqliteParameter("@Temp", point.Temp));
+    cmd.ExecuteNonQuery();
+}
+
+transaction.Commit();

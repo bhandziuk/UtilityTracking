@@ -17,8 +17,7 @@ namespace UtilityTracking.GeorgiaPower
     {
         private readonly HttpClient Client;
         private string? Jwt;
-        private string? AccountNumber;
-        private MeterServicePoint MeterServicePoint;
+        public Account Account { get; private set; }
 
         public Requests(HttpClient client)
         {
@@ -38,9 +37,9 @@ namespace UtilityTracking.GeorgiaPower
             return json["Data"].First()["AccountNumber"].ToString();
         }
 
-        private async Task<MeterServicePoint> GetServicePointNumber()
+        private async Task<MeterServicePoint> GetServicePointNumber(string accountNumber)
         {
-            var request = new HttpRequestMessage(HttpMethod.Get, $"https://customerservice2api.southerncompany.com/api/MyPowerUsage/getMPUBasicAccountInformation/{AccountNumber}/GPC");
+            var request = new HttpRequestMessage(HttpMethod.Get, $"https://customerservice2api.southerncompany.com/api/MyPowerUsage/getMPUBasicAccountInformation/{accountNumber}/GPC");
 
             request.Headers.Add("Authorization", "Bearer " + Jwt);
 
@@ -54,14 +53,14 @@ namespace UtilityTracking.GeorgiaPower
 
         public async Task<PowerUsageResult?> Hourly(DateTime startDate, DateTime endDate)
         {
-            var builder = new UriBuilder($"https://customerservice2api.southerncompany.com/api/MyPowerUsage/MPUData/{AccountNumber}/Hourly");
+            var builder = new UriBuilder($"https://customerservice2api.southerncompany.com/api/MyPowerUsage/MPUData/{Account.AccountNumber}/Hourly");
             var query = HttpUtility.ParseQueryString(builder.Query);
             //query["params"] = "OPCO=GPC";
             query["StartDate"] = startDate.ToString("MM/dd/yyyy");
             query["EndDate"] = endDate.ToString("MM/dd/yyyy"); ;
             query["intervalBehavior"] = "Automatic";
-            query["ServicePointNumber"] = MeterServicePoint.ServicePointNumber;
-            query["OPCO"] = "GPC";
+            query["ServicePointNumber"] = Account.MeterServicePoint.ServicePointNumber;
+            query["OPCO"] = Account.Company;
 
             builder.Query = query.ToString();
             string url = builder.ToString();
@@ -73,7 +72,10 @@ namespace UtilityTracking.GeorgiaPower
 
             var data = await response.Content.ReadAsStringAsync();
 
-            return await response.Content.ReadFromJsonAsync<PowerUsageResult>();
+            var inner = JObject.Parse(data)["Data"]["Data"];
+            var hourlyData = JObject.Parse(inner.ToString()).ToObject<PowerUsageResult>();
+
+            return hourlyData;
         }
 
         public async Task Authenticate(UserCredentials credentials)
@@ -82,8 +84,10 @@ namespace UtilityTracking.GeorgiaPower
             var scWebToken = await GetScWebToken(credentials, verificationToken);
             Jwt = await GetJwt(scWebToken);
 
-            AccountNumber = await GetAccountInfo();
-            MeterServicePoint = await GetServicePointNumber();
+            var accountNumber = await GetAccountInfo();
+            var meterServicePoint = await GetServicePointNumber(accountNumber);
+
+            Account = new Account(accountNumber, meterServicePoint, "GPC");
         }
 
         private async Task<string> GetJwt(string scWebToken)
@@ -110,17 +114,6 @@ namespace UtilityTracking.GeorgiaPower
             var southernJwtCookie = cookies.FirstOrDefault(o => o.StartsWith("ScJwtToken", StringComparison.InvariantCultureIgnoreCase));
 
             return southernJwtCookie.Split(";").First().Substring("ScJwtToken=".Length);
-        }
-
-        private async Task<string> GetJwtScJwtToken(string southernJwt)
-        {
-            var request = new HttpRequestMessage(HttpMethod.Get, "$https://customerservice2api.southerncompany.com/api/account/getProductPortalJwt/{AccountNumber}");
-
-            request.Headers.Add("Authorization", "Bearer " + southernJwt);
-
-            var response = await Client.SendAsync(request);
-
-            return "";
         }
 
         private async Task<string> GetVerificationToken()
@@ -150,7 +143,7 @@ namespace UtilityTracking.GeorgiaPower
             return scWebToken.First();
         }
 
-        public Task<HttpResponseMessage> Login(UserCredentials credentials)
+        private Task<HttpResponseMessage> Login(UserCredentials credentials)
         {
             var request = new HttpRequestMessage(HttpMethod.Post, "https://webauth.southernco.com/webservices/api/WebUser/Login");
 
