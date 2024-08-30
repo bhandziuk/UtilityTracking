@@ -3,24 +3,53 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Cache;
 using System.Net.Http.Json;
 using System.Reflection.Metadata.Ecma335;
 using System.Text;
 using System.Threading.Tasks;
 using System.Web;
+using Newtonsoft.Json.Linq;
 
 namespace UtilityTracking.GeorgiaPower
 {
     public class Requests
     {
         private readonly HttpClient Client;
-        private readonly string? ServicePointNumber;
-        private string Jwt;
-        private string AccountNumber;
+        private string? Jwt;
+        private string? AccountNumber;
+        private MeterServicePoint MeterServicePoint;
 
         public Requests(HttpClient client)
         {
             Client = client;
+        }
+
+        private async Task<string> GetAccountInfo()
+        {
+            var request = new HttpRequestMessage(HttpMethod.Get, "https://customerservice2api.southerncompany.com/api/account/getAllAccounts");
+
+            request.Headers.Add("Authorization", "Bearer " + Jwt);
+
+            var response = await Client.SendAsync(request);
+
+            var data = await response.Content.ReadAsStringAsync();
+            var json = JObject.Parse(data);
+            return json["Data"].First()["AccountNumber"].ToString();
+        }
+
+        private async Task<MeterServicePoint> GetServicePointNumber()
+        {
+            var request = new HttpRequestMessage(HttpMethod.Get, $"https://customerservice2api.southerncompany.com/api/MyPowerUsage/getMPUBasicAccountInformation/{AccountNumber}/GPC");
+
+            request.Headers.Add("Authorization", "Bearer " + Jwt);
+
+            var response = await Client.SendAsync(request);
+            var data = await response.Content.ReadAsStringAsync();
+            var json = JObject.Parse(data);
+            var meterAndService = json["Data"]["meterAndServicePoints"].First().ToObject<MeterServicePoint>();
+
+            return meterAndService;
         }
 
         public async Task<PowerUsageResult?> Hourly(DateTime startDate, DateTime endDate)
@@ -31,7 +60,7 @@ namespace UtilityTracking.GeorgiaPower
             query["StartDate"] = startDate.ToString("MM/dd/yyyy");
             query["EndDate"] = endDate.ToString("MM/dd/yyyy"); ;
             query["intervalBehavior"] = "Automatic";
-            query["ServicePointNumber"] = ServicePointNumber;
+            query["ServicePointNumber"] = MeterServicePoint.ServicePointNumber;
             query["OPCO"] = "GPC";
 
             builder.Query = query.ToString();
@@ -52,6 +81,9 @@ namespace UtilityTracking.GeorgiaPower
             var verificationToken = await GetVerificationToken();
             var scWebToken = await GetScWebToken(credentials, verificationToken);
             Jwt = await GetJwt(scWebToken);
+
+            AccountNumber = await GetAccountInfo();
+            MeterServicePoint = await GetServicePointNumber();
         }
 
         private async Task<string> GetJwt(string scWebToken)

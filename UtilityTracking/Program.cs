@@ -39,9 +39,10 @@ var credentials = provider.GetService<GeorgiaPowerCredentials>();
 
 await requests.Authenticate(credentials);
 
+var startDate = DateTime.Parse("08/26/2023");
+var endDate = DateTime.Parse("08/27/2024");
 
-
-var hourlyData = await requests.Hourly(DateTime.Parse("08/26/2023"), DateTime.Parse("08/27/2024"));
+var hourlyData = await requests.Hourly(startDate, endDate);
 
 var rootDir = Directory.GetParent(AppDomain.CurrentDomain.BaseDirectory).Parent.Parent.Parent.Parent.FullName;
 
