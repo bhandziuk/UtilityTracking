@@ -31,7 +31,56 @@ namespace UtilityTracking.GeorgiaPower
             Account = new Account(accountNumber, meterServicePoint, "GPC");
         }
 
-        public async Task<PowerUsageResult> Hourly(DateTime startDate, DateTime endDate)
+        public async Task<DailyPowerUsageResult> Daily(DateTime startDate, DateTime endDate)
+        {
+            if (Account == null)
+            {
+                throw new Exception("You need to authenticate first");
+            }
+
+            var builder = new UriBuilder($"https://customerservice2api.southerncompany.com/api/MyPowerUsage/MPUData/{Account.AccountNumber}/Daily");
+            var query = HttpUtility.ParseQueryString(builder.Query);
+            //query["params"] = "OPCO=GPC";
+            query["StartDate"] = startDate.ToString("MM/dd/yyyy");
+            query["EndDate"] = endDate.ToString("MM/dd/yyyy"); ;
+            query["intervalBehavior"] = "Automatic";
+            query["ServicePointNumber"] = Account.MeterServicePoint.ServicePointNumber;
+            query["OPCO"] = Account.Company;
+
+            builder.Query = query.ToString();
+            string url = builder.ToString();
+
+            var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.Add("Authorization", "Bearer " + Jwt);
+
+            var response = await Client.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new Exception("Could not query MyPowerUsage/MPUData/AccountNumber/Daily");
+            }
+
+            var json = await response.Content.ReadAsStringAsync();
+            var data = JObject.Parse(json);
+
+            if (data.TryGetValue("Data", out var dataOuterNode) && dataOuterNode.ToObject<JObject>()!.TryGetValue("Data", out var dataInnerNode))
+            {
+                var dailyData = JObject.Parse(dataInnerNode.ToString()).ToObject<DailyPowerUsageResult>();
+                if (dailyData != null)
+                {
+                    return dailyData;
+                }
+                else
+                {
+                    throw new InvalidDataException("Cannot parse the HourlyData");
+                }
+            }
+            else
+            {
+                throw new InvalidDataException("Cannot find the HourlyData");
+            }
+        }
+
+        public async Task<HourlyPowerUsageResult> Hourly(DateTime startDate, DateTime endDate)
         {
             if (Account == null)
             {
@@ -64,7 +113,7 @@ namespace UtilityTracking.GeorgiaPower
 
             if (data.TryGetValue("Data", out var dataOuterNode) && dataOuterNode.ToObject<JObject>()!.TryGetValue("Data", out var dataInnerNode))
             {
-                var hourlyData = JObject.Parse(dataInnerNode.ToString()).ToObject<PowerUsageResult>();
+                var hourlyData = JObject.Parse(dataInnerNode.ToString()).ToObject<HourlyPowerUsageResult>();
                 if (hourlyData != null)
                 {
                     return hourlyData;

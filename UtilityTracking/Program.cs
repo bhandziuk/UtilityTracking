@@ -49,6 +49,10 @@ else
 var startDate = DateTime.Parse("08/26/2023");
 var endDate = DateTime.Parse("08/27/2024");
 
-var hourlyData = await gaPower.Hourly(startDate, endDate);
+//var hourlyData = await gaPower.Hourly(startDate, endDate);
+//GeorgiaPower.WriteHourlyDataToSqlite(gaPower.Account!.AccountNumber, hourlyData);
 
-GeorgiaPower.WriteHourlyDataToSqlite(gaPower.Account!.AccountNumber, hourlyData);
+var dailyData = await gaPower.Daily(startDate, endDate);
+
+GeorgiaPower.WriteDailyDataToSqlite(gaPower.Account!.AccountNumber, dailyData);
+
