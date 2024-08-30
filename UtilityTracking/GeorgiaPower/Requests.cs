@@ -13,46 +13,31 @@ using Newtonsoft.Json.Linq;
 
 namespace UtilityTracking.GeorgiaPower
 {
-    public class Requests
+    public class Requests(HttpClient client)
     {
-        private readonly HttpClient Client;
+        private readonly HttpClient Client = client;
         private string? Jwt;
-        public Account Account { get; private set; }
+        public Account? Account { get; private set; }
 
-        public Requests(HttpClient client)
+        public async Task Authenticate(UserCredentials credentials)
         {
-            Client = client;
+            var verificationToken = await GetVerificationToken();
+            var scWebToken = await GetScWebToken(credentials, verificationToken);
+            Jwt = await GetJwt(scWebToken);
+
+            var accountNumber = await GetAccountInfo();
+            var meterServicePoint = await GetServicePointNumber(accountNumber);
+
+            Account = new Account(accountNumber, meterServicePoint, "GPC");
         }
 
-        private async Task<string> GetAccountInfo()
+        public async Task<PowerUsageResult> Hourly(DateTime startDate, DateTime endDate)
         {
-            var request = new HttpRequestMessage(HttpMethod.Get, "https://customerservice2api.southerncompany.com/api/account/getAllAccounts");
+            if (Account == null)
+            {
+                throw new Exception("You need to authenticate first");
+            }
 
-            request.Headers.Add("Authorization", "Bearer " + Jwt);
-
-            var response = await Client.SendAsync(request);
-
-            var data = await response.Content.ReadAsStringAsync();
-            var json = JObject.Parse(data);
-            return json["Data"].First()["AccountNumber"].ToString();
-        }
-
-        private async Task<MeterServicePoint> GetServicePointNumber(string accountNumber)
-        {
-            var request = new HttpRequestMessage(HttpMethod.Get, $"https://customerservice2api.southerncompany.com/api/MyPowerUsage/getMPUBasicAccountInformation/{accountNumber}/GPC");
-
-            request.Headers.Add("Authorization", "Bearer " + Jwt);
-
-            var response = await Client.SendAsync(request);
-            var data = await response.Content.ReadAsStringAsync();
-            var json = JObject.Parse(data);
-            var meterAndService = json["Data"]["meterAndServicePoints"].First().ToObject<MeterServicePoint>();
-
-            return meterAndService;
-        }
-
-        public async Task<PowerUsageResult?> Hourly(DateTime startDate, DateTime endDate)
-        {
             var builder = new UriBuilder($"https://customerservice2api.southerncompany.com/api/MyPowerUsage/MPUData/{Account.AccountNumber}/Hourly");
             var query = HttpUtility.ParseQueryString(builder.Query);
             //query["params"] = "OPCO=GPC";
@@ -69,25 +54,87 @@ namespace UtilityTracking.GeorgiaPower
             request.Headers.Add("Authorization", "Bearer " + Jwt);
 
             var response = await Client.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new Exception("Could not query MyPowerUsage/MPUData/AccountNumber/Hourly");
+            }
 
-            var data = await response.Content.ReadAsStringAsync();
+            var json = await response.Content.ReadAsStringAsync();
+            var data = JObject.Parse(json);
 
-            var inner = JObject.Parse(data)["Data"]["Data"];
-            var hourlyData = JObject.Parse(inner.ToString()).ToObject<PowerUsageResult>();
-
-            return hourlyData;
+            if (data.TryGetValue("Data", out var dataOuterNode) && dataOuterNode.ToObject<JObject>()!.TryGetValue("Data", out var dataInnerNode))
+            {
+                var hourlyData = JObject.Parse(dataInnerNode.ToString()).ToObject<PowerUsageResult>();
+                if (hourlyData != null)
+                {
+                    return hourlyData;
+                }
+                else
+                {
+                    throw new InvalidDataException("Cannot parse the HourlyData");
+                }
+            }
+            else
+            {
+                throw new InvalidDataException("Cannot find the HourlyData");
+            }
         }
 
-        public async Task Authenticate(UserCredentials credentials)
+        private async Task<string> GetAccountInfo()
         {
-            var verificationToken = await GetVerificationToken();
-            var scWebToken = await GetScWebToken(credentials, verificationToken);
-            Jwt = await GetJwt(scWebToken);
+            var request = new HttpRequestMessage(HttpMethod.Get, "https://customerservice2api.southerncompany.com/api/account/getAllAccounts");
 
-            var accountNumber = await GetAccountInfo();
-            var meterServicePoint = await GetServicePointNumber(accountNumber);
+            request.Headers.Add("Authorization", "Bearer " + Jwt);
 
-            Account = new Account(accountNumber, meterServicePoint, "GPC");
+            var response = await Client.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new Exception("Could not query account/getAllAccounts");
+            }
+
+            var json = await response.Content.ReadAsStringAsync();
+
+            var data = JObject.Parse(json);
+            if (data.TryGetValue("Data", out var dataNode) && dataNode.Any() && dataNode.First()["AccountNumber"] != null)
+            {
+                return dataNode.First()["AccountNumber"]!.ToString();
+            }
+            else
+            {
+                throw new InvalidDataException("Cannot find the AccountNumber");
+            }
+        }
+
+        private async Task<MeterServicePoint> GetServicePointNumber(string accountNumber)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Get, $"https://customerservice2api.southerncompany.com/api/MyPowerUsage/getMPUBasicAccountInformation/{accountNumber}/GPC");
+
+            request.Headers.Add("Authorization", "Bearer " + Jwt);
+
+            var response = await Client.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new Exception("Could not query MyPowerUsage/getMPUBasicAccountInformation");
+            }
+
+            var json = await response.Content.ReadAsStringAsync();
+            var data = JObject.Parse(json);
+            if (data.TryGetValue("Data", out var dataNode) && dataNode.ToObject<JObject>()!.TryGetValue("meterAndServicePoints", out var meterAndServicePoints))
+            {
+                var meterAndService = meterAndServicePoints.First().ToObject<MeterServicePoint>();
+                if (meterAndService != null)
+                {
+                    return meterAndService;
+                }
+                else
+                {
+                    throw new InvalidDataException("Cannot parse the meterAndServicePoints");
+                }
+            }
+            else
+            {
+                throw new InvalidDataException("Cannot find the meterAndServicePoints");
+            }
         }
 
         private async Task<string> GetJwt(string scWebToken)
@@ -112,11 +159,17 @@ namespace UtilityTracking.GeorgiaPower
             var cookies = response.Headers.SingleOrDefault(header => header.Key.Equals("Set-Cookie", StringComparison.InvariantCultureIgnoreCase)).Value;
 
             var southernJwtCookie = cookies.FirstOrDefault(o => o.StartsWith("ScJwtToken", StringComparison.InvariantCultureIgnoreCase));
-
-            return southernJwtCookie.Split(";").First().Substring("ScJwtToken=".Length);
+            if (southernJwtCookie != null)
+            {
+                return southernJwtCookie.Split(";").First()["ScJwtToken=".Length..];
+            }
+            else
+            {
+                throw new InvalidDataException("Cannot find the ScJwtToken");
+            }
         }
 
-        private async Task<string> GetVerificationToken()
+        private static async Task<string> GetVerificationToken()
         {
             var web = new HtmlWeb();
             var doc = await web.LoadFromWebAsync("https://webauth.southernco.com/account/login");
@@ -134,25 +187,20 @@ namespace UtilityTracking.GeorgiaPower
             request.Content = JsonContent.Create(payload);
             var result = await Client.SendAsync(request);
             var content = await result.Content.ReadFromJsonAsync<LoginResponse>();
+            if (content != null)
+            {
 
-            var doc = new HtmlDocument();
-            doc.LoadHtml(content.Data.Html);
-            var scWebToken = doc.DocumentNode.SelectNodes(@"//input").Where(o => o.GetAttributes("NAME").Any(attr => attr != null && attr.Value == "ScWebToken") && o.GetAttributes("value").Any())
-                .Select(o => o.GetAttributeValue<string>("value", ""));
+                var doc = new HtmlDocument();
+                doc.LoadHtml(content.Data.Html);
+                var scWebToken = doc.DocumentNode.SelectNodes(@"//input").Where(o => o.GetAttributes("NAME").Any(attr => attr != null && attr.Value == "ScWebToken") && o.GetAttributes("value").Any())
+                    .Select(o => o.GetAttributeValue<string>("value", ""));
 
-            return scWebToken.First();
-        }
-
-        private Task<HttpResponseMessage> Login(UserCredentials credentials)
-        {
-            var request = new HttpRequestMessage(HttpMethod.Post, "https://webauth.southernco.com/webservices/api/WebUser/Login");
-
-            request.Headers.Add("Referer", "https://webauth.southernco.com/SPA/OCC/login");
-
-            var payload = new { username = credentials.Username, password = credentials.Password, applicationType = "E", applicationId = "OCC", company = "SCS" };
-            request.Content = JsonContent.Create(payload);
-
-            return Client.SendAsync(request);
+                return scWebToken.First();
+            }
+            else
+            {
+                throw new InvalidDataException("Cannot find the RequestVerificationToken");
+            }
         }
     }
 }

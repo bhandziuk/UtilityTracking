@@ -36,21 +36,25 @@ var provider = services.BuildServiceProvider();
 
 var gaPower = provider.GetRequiredService<Requests>();
 var credentials = provider.GetService<GeorgiaPowerCredentials>();
-
-await gaPower.Authenticate(credentials);
+if (credentials != null)
+{
+    await gaPower.Authenticate(credentials);
+}
+else
+{
+    // prompt for credentials then authenticate
+}
 
 var startDate = DateTime.Parse("08/26/2023");
 var endDate = DateTime.Parse("08/27/2024");
 
 var hourlyData = await gaPower.Hourly(startDate, endDate);
 
-var rootDir = Directory.GetParent(AppDomain.CurrentDomain.BaseDirectory).Parent.Parent.Parent.Parent.FullName;
-
 var appData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), AppDomain.CurrentDomain.FriendlyName);
 
 Directory.CreateDirectory(appData);
 
-var sqliteFile = Path.Combine(appData, gaPower.Account.AccountNumber + ".db");
+var sqliteFile = Path.Combine(appData, gaPower.Account!.AccountNumber + ".db");
 
 using var connection = new SqliteConnection($"Data Source={sqliteFile};");
 

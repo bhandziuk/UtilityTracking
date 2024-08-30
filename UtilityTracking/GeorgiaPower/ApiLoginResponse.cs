@@ -6,11 +6,11 @@ using System.Threading.Tasks;
 
 namespace UtilityTracking.GeorgiaPower
 {
-    public class ApiLoginResponse
+    public class ApiLoginResponse(double statusCode, string message, bool isSuccess, object modelErrors)
     {
-        public double StatusCode { get; set; }
-        public string Message { get; set; }
-        public bool IsSuccess { get; set; }
-        public object ModelErrors { get; set; }
+        public double StatusCode { get; set; } = statusCode;
+        public string Message { get; set; } = message;
+        public bool IsSuccess { get; set; } = isSuccess;
+        public object ModelErrors { get; set; } = modelErrors;
     }
 }
