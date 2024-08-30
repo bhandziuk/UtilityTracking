@@ -48,18 +48,6 @@ var rootDir = Directory.GetParent(AppDomain.CurrentDomain.BaseDirectory).Parent.
 
 var appData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), AppDomain.CurrentDomain.FriendlyName);
 
-//var hourlyText = File.OpenText(Path.Combine(rootDir, "Hourly GA Power Data.json")).ReadToEnd();
-
-//var serializer = new JsonSerializerSettings
-//{
-//    ContractResolver = new CamelCasePropertyNamesContractResolver(),
-//    Converters = { new IsoDateTimeConverter() }
-//};
-
-//var data = JsonConvert.DeserializeObject<PowerUsageResult>(hourlyText, serializer);
-
-//var total = data.Series.Cost.Data.Count();
-
 Directory.CreateDirectory(appData);
 
 var sqliteFile = Path.Combine(appData, gaPower.Account.AccountNumber + ".db");
