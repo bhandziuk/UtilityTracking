@@ -188,8 +188,33 @@ namespace UtilityTracking.GeorgiaPower
 
         private async Task<string> GetJwt(string scWebToken)
         {
-            return await GetJwtFromScWebToken(scWebToken);
+            var firstJwt = await GetJwtFromScWebToken(scWebToken);
+            return await GetJwtToken(firstJwt);
             //return await GetJwtScJwtToken(step1);
+        }
+
+        private async Task<string> GetJwtToken(string firstJwt)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Get, "https://customerservice2.southerncompany.com/Account/LoginValidated/JwtToken");
+
+            var body = new Dictionary<string, string>()
+            {
+                { "Cookie", $"SouthernJwtCookie={firstJwt}" }
+            };
+
+            var response = await Client.SendAsync(request);
+
+            var cookies = response.Headers.SingleOrDefault(header => header.Key.Equals("Set-Cookie", StringComparison.InvariantCultureIgnoreCase)).Value;
+
+            var southernJwtCookie = cookies.FirstOrDefault(o => o.StartsWith("ScJwtToken", StringComparison.InvariantCultureIgnoreCase));
+            if (southernJwtCookie != null)
+            {
+                return southernJwtCookie.Split(";").First()["ScJwtToken=".Length..];
+            }
+            else
+            {
+                throw new InvalidDataException("Cannot find the ScJwtToken");
+            }
         }
 
         private async Task<string> GetJwtFromScWebToken(string scWebToken)
@@ -207,14 +232,14 @@ namespace UtilityTracking.GeorgiaPower
 
             var cookies = response.Headers.SingleOrDefault(header => header.Key.Equals("Set-Cookie", StringComparison.InvariantCultureIgnoreCase)).Value;
 
-            var southernJwtCookie = cookies.FirstOrDefault(o => o.StartsWith("ScJwtToken", StringComparison.InvariantCultureIgnoreCase));
+            var southernJwtCookie = cookies.FirstOrDefault(o => o.StartsWith("SouthernJwtCookie", StringComparison.InvariantCultureIgnoreCase));
             if (southernJwtCookie != null)
             {
-                return southernJwtCookie.Split(";").First()["ScJwtToken=".Length..];
+                return southernJwtCookie.Split(";").First()["SouthernJwtCookie=".Length..];
             }
             else
             {
-                throw new InvalidDataException("Cannot find the ScJwtToken");
+                throw new InvalidDataException("Cannot find the SouthernJwtCookie");
             }
         }
 
