@@ -15,13 +15,15 @@ namespace UtilityTracking.UtilityDatabase
             var appData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), AppDomain.CurrentDomain.FriendlyName);
 
             Directory.CreateDirectory(appData);
-
-            return Path.Combine(appData, accountNumber + ".db");
+            // var date = DateTime.Now.ToString("yyyyMMdd");
+            // return Path.Combine(appData, $"{accountNumber}-{date}.db");
+            return Path.Combine(appData, $"{accountNumber}.db");
         }
 
         public static void WriteDailyDataToSqlite(string accountNumber, DailyPowerUsageResult dailyData)
         {
             var sqliteFile = GetSqlitePath(accountNumber);
+            Console.WriteLine("Opening sqlite for daily data: {0}", sqliteFile);
             using var connection = new SqliteConnection($"Data Source={sqliteFile};");
 
             connection.Open();
@@ -57,6 +59,7 @@ namespace UtilityTracking.UtilityDatabase
         public static void WriteHourlyDataToSqlite(string accountNumber, HourlyPowerUsageResult hourlyData)
         {
             var sqliteFile = GetSqlitePath(accountNumber);
+            Console.WriteLine("Opening sqlite for hourly data: {0}", sqliteFile);
             using var connection = new SqliteConnection($"Data Source={sqliteFile};");
 
             connection.Open();

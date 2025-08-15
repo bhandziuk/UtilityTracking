@@ -53,11 +53,15 @@ namespace UtilityTracking.GeorgiaPower
             var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Add("Authorization", "Bearer " + Jwt);
 
+            Console.WriteLine("Fetching daily data for {0} to {1}", query["StartDate"], query["EndDate"]);
+
             var response = await Client.SendAsync(request);
             if (!response.IsSuccessStatusCode)
             {
                 throw new Exception("Could not query MyPowerUsage/MPUData/AccountNumber/Daily");
             }
+
+            Console.WriteLine("Received valid response");
 
             var json = await response.Content.ReadAsStringAsync();
             var data = JObject.Parse(json);
@@ -67,6 +71,7 @@ namespace UtilityTracking.GeorgiaPower
                 var dailyData = JObject.Parse(dataInnerNode.ToString()).ToObject<DailyPowerUsageResult>();
                 if (dailyData != null)
                 {
+                    Console.WriteLine("Parsed {0} daily usage records", dailyData.Series.WeekdayUsage.Data.Count() + dailyData.Series.WeekendUsage.Data.Count());
                     return dailyData;
                 }
                 else
@@ -102,11 +107,14 @@ namespace UtilityTracking.GeorgiaPower
             var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Add("Authorization", "Bearer " + Jwt);
 
+            Console.WriteLine("Fetching hourly data for {0} to {1}", query["StartDate"], query["EndDate"]);
             var response = await Client.SendAsync(request);
             if (!response.IsSuccessStatusCode)
             {
                 throw new Exception("Could not query MyPowerUsage/MPUData/AccountNumber/Hourly");
             }
+
+            Console.WriteLine("Received valid response");
 
             var json = await response.Content.ReadAsStringAsync();
             var data = JObject.Parse(json);
@@ -116,6 +124,7 @@ namespace UtilityTracking.GeorgiaPower
                 var hourlyData = JObject.Parse(dataInnerNode.ToString()).ToObject<HourlyPowerUsageResult>();
                 if (hourlyData != null)
                 {
+                    Console.WriteLine("Parsed {0} hourly usage records", hourlyData.Series.Usage.Data.Count());
                     return hourlyData;
                 }
                 else
