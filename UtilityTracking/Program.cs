@@ -21,6 +21,7 @@ var config = builder.Build();
 var services = new ServiceCollection();
 
 services.ConfigureRequiredSettings(config, typeof(GeorgiaPowerCredentials));
+services.ConfigureRequiredSettings(config, typeof(FetchRange));
 services.AddSingleton(provider =>
 {
     var handler = new HttpClientHandler()
@@ -45,13 +46,11 @@ else
 {
     // prompt for credentials then authenticate
 }
+var fetchRange = provider.GetRequiredService<FetchRange>();
 
-var startDate = DateTime.Parse("07/01/2024");
-var endDate = DateTime.Parse("8/12/2025");
-
-var hourlyData = await gaPower.Hourly(startDate, endDate);
+var hourlyData = await gaPower.Hourly(fetchRange.StartDate, fetchRange.EndDate);
 GeorgiaPower.WriteHourlyDataToSqlite(gaPower.Account!.AccountNumber, hourlyData);
 
-var dailyData = await gaPower.Daily(startDate, endDate);
+var dailyData = await gaPower.Daily(fetchRange.StartDate, fetchRange.EndDate);
 GeorgiaPower.WriteDailyDataToSqlite(gaPower.Account!.AccountNumber, dailyData);
 

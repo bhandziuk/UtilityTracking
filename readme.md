@@ -1,4 +1,22 @@
-﻿# Authentication Process
+﻿# How to fetch utility data
+
+Fill in the following objects in `secrets.json` (these stay on your computer and are not synced to GitHub):
+
+```
+{
+   "GeorgiaPowerCredentials":
+   {
+      "username": "your Georgia power user name",
+      "password": "your Georgia Power password"
+   },
+   "fetchRange":{
+      "startDate": "MM/dd/YYYY",
+      "endDate": "MM/dd/YYYY"
+   }
+}
+```
+
+# Authentication Process
 
 The authentication process was inspired by the authentication process in [southern-company-api](https://github.com/apearson/southern-company-api?tab=readme-ov-file#how-authentication-works) (by [apearson](https://github.com/apearson)) but differs slightly. After changes in the authentication process this library, [southern_company_api](https://github.com/Lash-L/southern_company_api/blob/main/src/southern_company_api/parser.py) by [Lash-L](https://github.com/Lash-L), was also helpful in disconvering the new workflow.
 
