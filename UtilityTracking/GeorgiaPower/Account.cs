@@ -6,5 +6,5 @@ using System.Threading.Tasks;
 
 namespace UtilityTracking.GeorgiaPower
 {
-    public record Account(string AccountNumber, MeterServicePoint MeterServicePoint, string Company);
+    public record Account(string AccountNumber, string ServicePointId, string Company);
 }
